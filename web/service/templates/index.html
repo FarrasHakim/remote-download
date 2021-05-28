@@ -1,0 +1,122 @@
+{% load static %}
+
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+        <link href="//maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" rel="stylesheet" id="bootstrap-css">
+        <script src="https://code.jquery.com/jquery-3.2.1.slim.min.js" integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN" crossorigin="anonymous"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js" integrity="sha384-ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q" crossorigin="anonymous"></script>
+        <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js" integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl" crossorigin="anonymous"></script>
+        <script src="https://code.jquery.com/jquery-3.6.0.js" integrity="sha256-H+K7U5CnXl1h5ywQfKtSj8PCmoN9aaq30gDh27Xc0jk=" crossorigin="anonymous"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.1.4/sockjs.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+        <link href='https://fonts.googleapis.com/css?family=Niramit' rel='stylesheet'>
+        <script src="https://code.jquery.com/jquery-3.6.0.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.3.1/js/bootstrap.bundle.min.js"></script>
+        <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css">
+        <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.8.1/css/all.css">
+
+        <link rel="stylesheet" href="{% static 'css/style.css' %}">
+        <title>
+            File Uplaod
+        </title>
+    </head>
+    <body>
+        {% if sessionId %}
+            <input type="hidden" id="sessionId" name="sessionId" value="{{sessionId}}">
+        {% endif %}
+        {% csrf_token %}
+        <div class="container">
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="card">
+                        <form id="url-form" class="box">
+                            <h1>Download By Url</h1>
+                            <p class="text-muted"> Please enter a url!</p> 
+                            <input type="text" id="url-text" placeholder="Insert Url"> 
+
+                            <input type="submit" value="Submit">
+                            <div class="col-md-12">
+                                <p class="text-white">Progress</p>
+                                <div class="progress mb-2">
+                                    <div id="progress-bar" class="progress-bar" role="progressbar" style="width: 50%" aria-valuenow="10" aria-valuemin="0" aria-valuemax="100"></div>
+                                </div>
+                                <p class="text-white">(<span id="progress-percentage">10</span>   %)</p>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </body>
+    <script>
+        var routing_key = Math.floor(Math.random()*1000000);
+        WebSocketTest();
+
+        $(document).ready(function() {
+            console.log("Hello world");
+            $('#url-form').on('submit', function(e){
+                e.preventDefault();
+                $("#progress-percentage").html(0);
+                $("#progress-bar").css("width", "0%");
+
+                $.ajax({
+                    url : '/',
+                    type: 'POST',
+                    // headers: {
+                    //     "X-CSRFToken": $("input[name='csrfmiddlewaretoken']").val()
+                    // },
+                    data: {
+                        x : 1,
+                        csrfmiddlewaretoken: $("input[name='csrfmiddlewaretoken']").val()
+                    },
+                    success : function(response) {
+                        console.log(response);
+                    },
+                    error : function(error) {
+                        console.log(error);
+                    }
+                });
+            });
+        });
+
+        function WebSocketTest() {
+                if ("WebSocket" in window) {
+                    var ws_stomp_display     = new WebSocket('ws://127.0.0.1:15674/ws');
+                    var client_display = Stomp.over(ws_stomp_display);
+                    var mq_queue_display    = "/exchange/1706024513/" + routing_key;
+                    console.log(mq_queue_display);
+                    var on_connect_display = function() {
+                        console.log('connecting...');
+                        client_display.subscribe(mq_queue_display, on_message_display);
+                    };
+
+                    var on_error_display =  function() {
+                        console.log('error');
+                    };
+
+                    var on_message_display = function(m) {
+                        message = JSON.parse(m.body);
+                        $("#progressValue").val(message.progress);
+                        $("#size_progress").html(message.size_progress/1000000);
+                        $("#total_size").html(message.total_size/1000000);
+                        $("#progress_percentage").html(message.progress);
+                        if (message.url) {
+                            alert("Download Ready");
+                            $("#download-link").attr("href", "http://" + message.url);
+                            $("#download-link").show();
+                        }
+                        console.log(message);
+                    };
+
+                    client_display.connect('guest', 'guest', on_connect_display, on_error_display, '/');
+
+                } else {
+                    // The browser doesn't support WebSocket
+                    alert("WebSocket NOT supported by your Browser!");
+                }
+            };
+    </script>
+</html>
