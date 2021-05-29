@@ -41,9 +41,9 @@
                             <div class="col-md-12">
                                 <p class="text-white">Progress</p>
                                 <div class="progress mb-2">
-                                    <div id="progress-bar" class="progress-bar" role="progressbar" style="width: 50%" aria-valuenow="10" aria-valuemin="0" aria-valuemax="100"></div>
+                                    <div id="progress-bar" class="progress-bar" role="progressbar" style="width: 0%" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
                                 </div>
-                                <p class="text-white">(<span id="progress-percentage">10</span>   %)</p>
+                                <p class="text-white">(<span id="progress-percentage">0</span>   %)</p>
                             </div>
                         </form>
                     </div>
@@ -52,8 +52,6 @@
         </div>
     </body>
     <script>
-        var routing_key = Math.floor(Math.random()*1000000);
-        WebSocketTest();
 
         $(document).ready(function() {
             console.log("Hello world");
@@ -61,6 +59,8 @@
                 e.preventDefault();
                 $("#progress-percentage").html(0);
                 $("#progress-bar").css("width", "0%");
+                var url_text = $("#url-text").val();
+                $("#url-text").val("");
 
                 $.ajax({
                     url : '/',
@@ -69,11 +69,11 @@
                     //     "X-CSRFToken": $("input[name='csrfmiddlewaretoken']").val()
                     // },
                     data: {
-                        x : 1,
+                        url_text : url_text,
                         csrfmiddlewaretoken: $("input[name='csrfmiddlewaretoken']").val()
                     },
-                    success : function(response) {
-                        console.log(response);
+                    success : function(response) {                        
+                        WebSocketTest(response);
                     },
                     error : function(error) {
                         console.log(error);
@@ -82,11 +82,11 @@
             });
         });
 
-        function WebSocketTest() {
+        function WebSocketTest(response) {
                 if ("WebSocket" in window) {
                     var ws_stomp_display     = new WebSocket('ws://127.0.0.1:15674/ws');
                     var client_display = Stomp.over(ws_stomp_display);
-                    var mq_queue_display    = "/exchange/1706024513/" + routing_key;
+                    var mq_queue_display    = "/exchange/1706024513/" + response;
                     console.log(mq_queue_display);
                     var on_connect_display = function() {
                         console.log('connecting...');
@@ -99,16 +99,16 @@
 
                     var on_message_display = function(m) {
                         message = JSON.parse(m.body);
-                        $("#progressValue").val(message.progress);
-                        $("#size_progress").html(message.size_progress/1000000);
-                        $("#total_size").html(message.total_size/1000000);
-                        $("#progress_percentage").html(message.progress);
-                        if (message.url) {
-                            alert("Download Ready");
-                            $("#download-link").attr("href", "http://" + message.url);
-                            $("#download-link").show();
-                        }
+                        
+                        $("#progress-percentage").html(message.percent);
+                        $("#progress-bar").css("width", message.percent + "%");
+                        $("#progress-bar").css("aria-valuenow", message.percent);
                         console.log(message);
+                        console.log($("#progress-bar").css("width"));
+                        if (message.urldownload) {
+                            $("#url-form").append("<a id='download_start' href=" + message.urldownload + ">Download File</a>");
+                            $("a#download_start").trigger("click").delay(2);
+                        };
                     };
 
                     client_display.connect('guest', 'guest', on_connect_display, on_error_display, '/');
