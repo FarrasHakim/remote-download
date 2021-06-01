@@ -87,7 +87,7 @@
                     var ws_stomp_display     = new WebSocket('ws://127.0.0.1:15674/ws');
                     var client_display = Stomp.over(ws_stomp_display);
                     var mq_queue_display    = "/exchange/1706024513/" + response;
-                    console.log(mq_queue_display);
+                    // console.log(mq_queue_display);
                     var on_connect_display = function() {
                         console.log('connecting...');
                         client_display.subscribe(mq_queue_display, on_message_display);
@@ -103,11 +103,12 @@
                         $("#progress-percentage").html(message.percent);
                         $("#progress-bar").css("width", message.percent + "%");
                         $("#progress-bar").css("aria-valuenow", message.percent);
-                        console.log(message);
-                        console.log($("#progress-bar").css("width"));
-                        if (message.urldownload) {
-                            $("#url-form").append("<a id='download_start' href=" + message.urldownload + "></a>");
-                            window.location.href = message.urldownload;
+                        if (message.endpointdownload) {
+                            $("#url-form").append("<a id='download_start' href=" + message.endpointdownload + "></a>");
+                            window.location.href = location.origin + message.endpointdownload;
+                        };
+                        if (message.error) {
+                            alert(message.error);
                         };
                     };
 

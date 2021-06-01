@@ -3,6 +3,7 @@ from concurrent import futures
 from grpcprotos import miniproject3_pb2 as mppb2
 from grpcprotos import miniproject3_pb2_grpc as mpgrpc
 import logging
+import traceback
 import grpc
 import random
 import pika
@@ -16,6 +17,8 @@ try:
     from urllib import unquote
 except ImportError: # Python 3
     from urllib.parse import urlsplit, unquote
+
+import requests
 
 class MiniProjectService(mpgrpc.MiniProjectServiceServicer):
 
@@ -53,49 +56,47 @@ def download(Url, unique_id):
     print("Routing key: " + routing_key)
     channel.exchange_declare(exchange=exchangemq, exchange_type='direct', durable=True)
 
-    with urllib.request.urlopen(Url) as Response:
-        Length = Response.getheader('content-length')
-        BlockSize = 1000000  # default value
+
+    try:
+        r = requests.get(Url, stream=True)
         name = getfilename(Url)
-
-        if Length:
-            Length = int(Length)
-            BlockSize = max(4096, Length // 20)
-
-        print("UrlLib len, blocksize: ", Length, BlockSize)
-
-        BufferAll = io.BytesIO()
-        Size = 0
-
-        with open("media/" +name, "wb") as filewritten:
-            while True:
-                BufferNow = Response.read(BlockSize)
-                if not BufferNow:
-                    break
-                BufferAll.write(BufferNow)
-                filewritten.write(BufferNow)
-                Size += len(BufferNow)
-                
-                if Length:
-                    Percent = int((Size / Length)*100)
+        path = 'media/' + name
+        with open(path, 'wb') as f:
+            total_length = int(r.headers.get('content-length'))
+            print ("Total length: " + str(total_length))
+            size_progress = 0
+            print ("Progress: " + str(size_progress))
+            chunk_size = 2048
+            for chunk in r.iter_content(chunk_size=chunk_size): 
+                if chunk:
+                    size_progress += chunk_size
+                    Percent = int((size_progress / total_length)*100)
                     message = {
                         "percent" : Percent,
-                        "size_progress" : Size,
-                        "total_size" : Length
+                        "size_progress" : size_progress,
+                        "total_size" : total_length
                     }
 
                     channel.basic_publish(exchange=exchangemq,
                                         routing_key=routing_key,
                                         body=json.dumps(message))
-                    # print(f"download: {Percent}% {Url}")
-        message["urldownload"] = "http://localhost:5001/media/" + name 
+                    f.write(chunk)
+                    f.flush()
+            
+            message["endpointdownload"] = "/media/" + name 
+            channel.basic_publish(exchange=exchangemq,
+                                routing_key=routing_key,
+                                body=json.dumps(message))
 
+    except Exception as e:
+        message = {}
+        message["error"] =  traceback.format_exc()
+        print("Error: ")
+        print(message["error"])
 
         channel.basic_publish(exchange=exchangemq,
                             routing_key=routing_key,
                             body=json.dumps(message))
-
-        print("Buffer All len:", len(BufferAll.getvalue()))
 
 if __name__ == '__main__':
     logging.basicConfig()
